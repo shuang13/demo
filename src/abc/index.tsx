@@ -116,7 +116,7 @@ interface IPoint {
 }
 
 let heatMap: Heatmap | null = null
-let heatMin = 0
+let heatMin = 1
 let heatMax = 40
 
 function initHeatmap() {
@@ -125,7 +125,7 @@ function initHeatmap() {
   data.pixels.map((p) => {
     if (p?.value) {
       dataList.push({
-        value: p?.value,
+        value: p?.value / 100,
         x: (p.pt.y - 60) / 170,
         y: -(p.pt.x - 55) / 160,
       })
@@ -175,7 +175,7 @@ function drawArea(name: string, points: any[]) {
   }
   shape.closePath();
   const geometry = new THREE.ShapeGeometry(shape);
-  const material = new THREE.MeshBasicMaterial({ color: 0x000055, opacity: 0.5, transparent: true });
+  const material = new THREE.MeshBasicMaterial({ color: 0x4A9EE5, opacity: 0.35, transparent: true });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(centroidX, 0.01, -centroidY);
   mesh.rotation.x = -Math.PI * 0.5;
@@ -328,12 +328,12 @@ const ABC: FC = () => {
     enableHeatMap: true,
     enableArea: true,
 
-    areaColor: '#F2F6F8',              // Default color for the area
+    areaColor: '#4A9EE5',              // Default color for the area
     areaPositionX: 0,                  // Default position X
     areaPositionY: 0,                  // Default position Y
     areaPositionZ: 0,                  // Default position Z
     areaMaterialType: 'MeshBasicMaterial',   // Default material type
-    areaTransparency: 1.0,              // Default opacity (1.0 = fully opaque)
+    areaTransparency: 0.35,              // Default opacity (1.0 = fully opaque)
     areaEmissiveColor: '#000000',      // Default emissive color
     areaRoughness: 0.5,                 // Default roughness
     areaMetalness: 0.0,                 // Default metalness
@@ -353,7 +353,7 @@ const ABC: FC = () => {
     wallEmissiveColor: '#000000',       // Default emissive color for walls
     wallRoughness: 0.5,                 // Default roughness for walls
     wallMetalness: 0.0,                 // Default metalness for walls
-    heatMin: 0,       // Default minimum heat value
+    heatMin: 1,       // Default minimum heat value
     heatMax: 40,      // Default maximum heat value
   };
   // 添加 Gui 调参可选项

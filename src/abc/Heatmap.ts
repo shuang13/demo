@@ -36,7 +36,7 @@ export default class Heatmap {
      
     })
     this.max = 40
-    this.min = 0
+    this.min = 1
 
     this.heatmapInstance.setData({
       data: [],
@@ -74,9 +74,7 @@ export default class Heatmap {
       if (v.value < this.min) {
         continue;
       }
-      if (v.value > this.max) {
-        this.max = v.value;
-      }
+      
       data.push(v);
     }
     this.heatmapInstance.setData({
@@ -95,9 +93,13 @@ export default class Heatmap {
     this.points = []
     for (let i = 0; i < dataList.length; i++) {
       const v = dataList[i];
-      if (v.value > this.max) {
-        this.max = v.value;
+      // if (v.value > this.max) {
+      //   this.max = v.value;
+      // }
+      if (v.value < this.min) {
+        continue;
       }
+      
       const x = Number((((v.x) + 0.5) * width).toFixed(0));
       const y = Number((((v.y) + 0.5) * height).toFixed(0));
       this.points.push({
