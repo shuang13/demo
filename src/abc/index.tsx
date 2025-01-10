@@ -7,7 +7,6 @@ import { DataTexture, RGBAFormat, PlaneGeometry, MeshBasicMaterial, Mesh, Vector
 import h377 from 'heatmap.js';
 import * as THREE from 'three';
 import useLilGui from './use-lil-gui';
-// import addHeatmap from './addHeatmap';
 import Heatmap from './Heatmap';
 import { data } from './data.tsx';
 
@@ -34,10 +33,10 @@ directionalLight.shadow.mapSize.height = 2048;
 directionalLight.shadow.camera.near = 0;
 directionalLight.shadow.camera.far = 1000;
 directionalLight.shadow.normalBias = 0.05;
-directionalLight.shadow.camera.left = -50; // 左边界
-directionalLight.shadow.camera.right = 50; // 右边界
-directionalLight.shadow.camera.top = 50; // 上边界
-directionalLight.shadow.camera.bottom = -50; //
+directionalLight.shadow.camera.left = -50;
+directionalLight.shadow.camera.right = 50;
+directionalLight.shadow.camera.top = 50;
+directionalLight.shadow.camera.bottom = -50;
 directionalLight.position.set(-200, 200, 200);
 scene.add(directionalLight);
 
@@ -47,12 +46,11 @@ css2DRenderer.setSize(window.innerWidth, window.innerHeight);
 css2DRenderer.render(scene, camera);
 css2DRenderer.domElement.style.position = "absolute";
 css2DRenderer.domElement.style.top = '0';
-css2DRenderer.domElement.style.pointerEvents = 'none'; // 取消标签的点击事件
+css2DRenderer.domElement.style.pointerEvents = 'none';
 window.document.body.appendChild(css2DRenderer.domElement);
 
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
-// draco是谷歌出的一款模型压缩工具，可以将glb/gltf格式的模型进行压缩用以提高页面加载速度。
 dracoLoader.setDecoderPath('/draco/');
 gltfLoader.setDRACOLoader(dracoLoader);
 let floorMesh = [];
@@ -63,7 +61,6 @@ gltfLoader.load('./yuhang.glb', (glb: any) => {
   floorMesh = [];
   wallMesh = [];
   glb.scene.children.forEach((item: THREE.Object3D) => {
-    // 物体阴影颜色 
     item.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         if (child.name == 'Floor') {
@@ -119,13 +116,16 @@ interface IPoint {
 }
 
 let heatMap: Heatmap | null = null
+let heatMin = 0
+let heatMax = 40
+
 function initHeatmap() {
   heatMap = new Heatmap()
   const dataList: IPoint[] = []
   data.pixels.map((p) => {
     if (p?.value) {
       dataList.push({
-        value: p?.value / 10,
+        value: p?.value,
         x: (p.pt.y - 60) / 170,
         y: -(p.pt.x - 55) / 160,
       })
@@ -135,6 +135,11 @@ function initHeatmap() {
   heatMap.init(scene, scene)
   heatMap.setData(dataList)
   heatMap.setVisible(true)
+}
+function updateHeatmap() {
+  if (heatMap) {
+      heatMap.setMinMax(heatMin, heatMax);
+  }
 }
 function initArea() {
   const w = data.cad_wh.col
@@ -221,7 +226,6 @@ function onDocumentMouseMove(event) {
   }
 }
 
-// 监听鼠标移动事件
 document.addEventListener('mousemove', onDocumentMouseMove, false);
 const ABC: FC = () => {
   const threeRef = useRef<HTMLDivElement>(null);
@@ -296,7 +300,8 @@ const ABC: FC = () => {
     wallEmissiveColor: string;         // Emissive color for the wall
     wallRoughness: number;             // Roughness of the wall material
     wallMetalness: number;             // Metalness of the wall material
-
+    heatMin: number;  // Minimum heat value
+    heatMax: number;  // Maximum heat value
   };
 
   const guiParams: GUIParams = {
@@ -348,9 +353,51 @@ const ABC: FC = () => {
     wallEmissiveColor: '#000000',       // Default emissive color for walls
     wallRoughness: 0.5,                 // Default roughness for walls
     wallMetalness: 0.0,                 // Default metalness for walls
+    heatMin: 0,       // Default minimum heat value
+    heatMax: 40,      // Default maximum heat value
   };
   // 添加 Gui 调参可选项
   const addParametersForGui = useCallback(() => {
+    const togglesFolder = guiEntity.addFolder('Toggles');
+    togglesFolder
+      ?.add(guiParams, 'enableHeatMap')
+      .onChange((val: boolean) => {
+        if (val) {
+          heatMap.setVisible(true); 
+        } else {
+          heatMap.setVisible(false); 
+        }
+      });
+    togglesFolder
+      ?.add(guiParams, 'enableArea')
+      .onChange((val: boolean) => {
+        areaMeshes.forEach(mesh => {
+          mesh.visible = val; 
+        });
+      });
+      
+    const heatmapFolder = guiEntity.addFolder('Heatmap');
+      heatmapFolder
+          ?.add(guiParams, 'heatMin')
+          .min(0)
+          .max(100)
+          .step(1)
+          .onFinishChange((val) => {
+              heatMin = val; // Update the heatMin
+              // You might want to refresh or update heatmap rendering logic here if necessary
+              updateHeatmap();
+          });
+      
+      heatmapFolder
+          ?.add(guiParams, 'heatMax')
+          .min(0)
+          .max(100)
+          .step(1)
+          .onFinishChange((val) => {
+              heatMax = val; // Update the heatMax
+              // Similarly refresh or update heatmap rendering logic
+              updateHeatmap();
+          });
     // Add shadow parameters
     const shadowFolder = guiEntity.addFolder('Shadow');
     shadowFolder
@@ -451,7 +498,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         floorMesh.forEach((mesh) => {
-          mesh.position.x = val; // Update X position for each floor mesh
+          mesh.position.x = val; 
         });
       });
     floorFolder
@@ -459,7 +506,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         floorMesh.forEach((mesh) => {
-          mesh.position.y = val; // Update Y position for each floor mesh
+          mesh.position.y = val; 
         });
       });
     floorFolder
@@ -467,7 +514,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         floorMesh.forEach((mesh) => {
-          mesh.position.z = val; // Update Z position for each floor mesh
+          mesh.position.z = val;
         });
       });
     floorFolder
@@ -508,15 +555,15 @@ const ABC: FC = () => {
       .min(0).max(1).step(0.01)
       .onFinishChange((val: number) => {
         floorMesh.forEach((mesh) => {
-          mesh.material.opacity = val; // Update transparency for each floor mesh
-          mesh.material.transparent = val < 1; // Set transparency flag
+          mesh.material.opacity = val;
+          mesh.material.transparent = val < 1;
         });
       });
     floorFolder
       ?.addColor(guiParams, 'floorEmissiveColor')
       .onFinishChange((val) => {
         floorMesh.forEach((mesh) => {
-          mesh.material.emissive.set(val); // Update emissive color
+          mesh.material.emissive.set(val);
         });
       });
     floorFolder
@@ -525,7 +572,7 @@ const ABC: FC = () => {
       .onFinishChange((val: number) => {
         floorMesh.forEach((mesh) => {
           if (mesh.material instanceof THREE.MeshStandardMaterial) {
-            mesh.material.roughness = val; // Update roughness for standard material
+            mesh.material.roughness = val;
           }
         });
       });
@@ -535,7 +582,7 @@ const ABC: FC = () => {
       .onFinishChange((val: number) => {
         floorMesh.forEach((mesh) => {
           if (mesh.material instanceof THREE.MeshStandardMaterial) {
-            mesh.material.metalness = val; // Update metalness for standard material
+            mesh.material.metalness = val;
           }
         });
       });
@@ -555,7 +602,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         wallMesh.forEach((mesh) => {
-          mesh.position.x = val; // Update X position for each wall mesh
+          mesh.position.x = val;
         });
       });
     wallFolder
@@ -563,7 +610,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         wallMesh.forEach((mesh) => {
-          mesh.position.y = val; // Update Y position for each wall mesh
+          mesh.position.y = val;
         });
       });
     wallFolder
@@ -571,7 +618,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         wallMesh.forEach((mesh) => {
-          mesh.position.z = val; // Update Z position for each wall mesh
+          mesh.position.z = val;
         });
       });
     wallFolder
@@ -612,15 +659,15 @@ const ABC: FC = () => {
       .min(0).max(1).step(0.01)
       .onFinishChange((val: number) => {
         wallMesh.forEach((mesh) => {
-          mesh.material.opacity = val; // Update transparency for each wall mesh
-          mesh.material.transparent = val < 1; // Set transparency flag
+          mesh.material.opacity = val;
+          mesh.material.transparent = val < 1;
         });
       });
     wallFolder
       ?.addColor(guiParams, 'wallEmissiveColor')
       .onFinishChange((val) => {
         wallMesh.forEach((mesh) => {
-          mesh.material.emissive.set(val); // Update emissive color
+          mesh.material.emissive.set(val);
         });
       });
     wallFolder
@@ -629,7 +676,7 @@ const ABC: FC = () => {
       .onFinishChange((val: number) => {
         wallMesh.forEach((mesh) => {
           if (mesh.material instanceof THREE.MeshStandardMaterial) {
-            mesh.material.roughness = val; // Update roughness for standard material
+            mesh.material.roughness = val;
           }
         });
       });
@@ -639,7 +686,7 @@ const ABC: FC = () => {
       .onFinishChange((val: number) => {
         wallMesh.forEach((mesh) => {
           if (mesh.material instanceof THREE.MeshStandardMaterial) {
-            mesh.material.metalness = val; // Update metalness for standard material
+            mesh.material.metalness = val;
           }
         });
       });
@@ -651,7 +698,7 @@ const ABC: FC = () => {
       .max(500)
       .step(1)
       .onFinishChange((val: number) => {
-        camera.position.x = val; // Update camera position X
+        camera.position.x = val;
         camera.updateProjectionMatrix();
       });
     cameraFolder
@@ -660,7 +707,7 @@ const ABC: FC = () => {
       .max(500)
       .step(1)
       .onFinishChange((val: number) => {
-        camera.position.y = val; // Update camera position Y
+        camera.position.y = val;
       });
     cameraFolder
       ?.add(guiParams, 'cameraPositionZ')
@@ -668,33 +715,16 @@ const ABC: FC = () => {
       .max(500)
       .step(1)
       .onFinishChange((val: number) => {
-        camera.position.z = val; // Update camera position Z
+        camera.position.z = val;
       });
 
-    const togglesFolder = guiEntity.addFolder('Toggles');
-    togglesFolder
-      ?.add(guiParams, 'enableHeatMap')
-      .onChange((val: boolean) => {
-        if (val) {
-          heatMap.setVisible(true); // Enable heatmap
-        } else {
-          heatMap.setVisible(false); // Disable heatmap
-        }
-      });
-    togglesFolder
-      ?.add(guiParams, 'enableArea')
-      .onChange((val: boolean) => {
-        areaMeshes.forEach(mesh => {
-          mesh.visible = val; // Show or hide each area mesh based on toggle
-        });
-      });
-    // Inside addParametersForGui
+    
     const areaFolder = guiEntity.addFolder('Area');
     areaFolder
       ?.addColor(guiParams, 'areaColor')
       .onFinishChange((val) => {
         areaMeshes.forEach(mesh => {
-          mesh.material.color.set(val); // Update area color for each mesh
+          mesh.material.color.set(val); 
         });
       });
     areaFolder
@@ -702,7 +732,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         areaMeshes.forEach(mesh => {
-          mesh.position.x = val; // Update X position of each area mesh
+          mesh.position.x = val; 
         });
       });
     areaFolder
@@ -710,7 +740,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         areaMeshes.forEach(mesh => {
-          mesh.position.y = val; // Update Y position of each area mesh
+          mesh.position.y = val; 
         });
       });
     areaFolder
@@ -718,7 +748,7 @@ const ABC: FC = () => {
       .min(-500).max(500).step(1)
       .onFinishChange((val: number) => {
         areaMeshes.forEach(mesh => {
-          mesh.position.z = val; // Update Z position of each area mesh
+          mesh.position.z = val; 
         });
       });
     areaFolder
@@ -751,8 +781,8 @@ const ABC: FC = () => {
             });
           }
 
-          mesh.material = newMaterial; // Update material
-          mesh.needsUpdate = true; // Mark the material for update
+          mesh.material = newMaterial; 
+          mesh.needsUpdate = true; 
         });
       });
     areaFolder
@@ -760,15 +790,15 @@ const ABC: FC = () => {
       .min(0).max(1).step(0.01)
       .onFinishChange((val: number) => {
         areaMeshes.forEach(mesh => {
-          mesh.material.opacity = val; // Update transparency
-          mesh.material.transparent = val < 1; // Enable transparency if not fully opaque
+          mesh.material.opacity = val; 
+          mesh.material.transparent = val < 1; 
         });
       });
     areaFolder
       ?.addColor(guiParams, 'areaEmissiveColor')
       .onFinishChange((val) => {
         areaMeshes.forEach(mesh => {
-          mesh.material.emissive.set(val); // Update emissive color
+          mesh.material.emissive.set(val); 
         });
       });
     areaFolder
@@ -777,7 +807,7 @@ const ABC: FC = () => {
       .onFinishChange((val: number) => {
         areaMeshes.forEach(mesh => {
           if (mesh.material instanceof THREE.MeshStandardMaterial) {
-            mesh.material.roughness = val; // Update roughness for standard material
+            mesh.material.roughness = val; 
           }
         });
       });
@@ -787,7 +817,7 @@ const ABC: FC = () => {
       .onFinishChange((val: number) => {
         areaMeshes.forEach(mesh => {
           if (mesh.material instanceof THREE.MeshStandardMaterial) {
-            mesh.material.metalness = val; // Update metalness for standard material
+            mesh.material.metalness = val; 
           }
         });
       });
@@ -815,9 +845,9 @@ const ABC: FC = () => {
 
   useEffect(() => {
     initSize();
-    if (threeRef.current) { // Ensure the ref is not null
-      threeRef.current.appendChild(renderer.domElement); // This should not fail now
-  }
+    if (threeRef.current) {
+      threeRef.current.appendChild(renderer.domElement);
+    }
     animate();
     return () => {
       cancelAnimationFrame(timer.current);

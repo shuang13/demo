@@ -36,7 +36,7 @@ export default class Heatmap {
      
     })
     this.max = 40
-    this.min = 10
+    this.min = 0
 
     this.heatmapInstance.setData({
       data: [],
@@ -61,22 +61,52 @@ export default class Heatmap {
     plane.position.set(0, 0.1, 0)
     return plane
   }
+  setMinMax(min: number, max: number): void {
+    this.max = max
+    this.min = min
+    const data = []
+    for (let i = 0; i < this.points.length; i++) {
+      const v = this.points[i];
+     
+      const x = Number((((v.x) + 0.5) * width).toFixed(0));
+      const y = Number((((v.y) + 0.5) * height).toFixed(0));
+
+      if (v.value < this.min) {
+        continue;
+      }
+      if (v.value > this.max) {
+        this.max = v.value;
+      }
+      data.push(v);
+    }
+    this.heatmapInstance.setData({
+      data: data,
+      max: this.max,
+      min: this.min
+    })  
+    this.heatmapInstance.repaint()
+    // @ts-ignore
+    if (this.plane && this.plane.material && this.plane.material.map) {
+      this.plane.material.map.needsUpdate = true;
+    }
+  }
 
   setData (dataList: IPoint[]): void {
     this.points = []
-    dataList.forEach((v) => {
+    for (let i = 0; i < dataList.length; i++) {
+      const v = dataList[i];
       if (v.value > this.max) {
-        // console.warn('max value increase to ', v.value)
-        this.max = v.value
+        this.max = v.value;
       }
-      const x = Number((((v.x) + 0.5) * width).toFixed(0))
-      const y = Number((((v.y) + 0.5) * height).toFixed(0))
+      const x = Number((((v.x) + 0.5) * width).toFixed(0));
+      const y = Number((((v.y) + 0.5) * height).toFixed(0));
       this.points.push({
         value: v.value,
         x,
         y
-      })
-    })
+      });
+    }
+    
     this.heatmapInstance.setData({
       data: this.points,
       max: this.max,
